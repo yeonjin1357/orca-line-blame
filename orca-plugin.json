@@ -1,0 +1,55 @@
+{
+  "manifestVersion": 2,
+  "id": "line-blame",
+  "name": "Line Blame",
+  "version": "0.1.0",
+  "description": "Read-only code view that shows who last changed the line you click, when and in which commit, and walks back through the commits that changed it before.",
+  "author": {
+    "name": "yeonjin1357",
+    "url": "https://github.com/yeonjin1357"
+  },
+  "repository": "https://github.com/yeonjin1357/orca-line-blame",
+  "homepage": "https://github.com/yeonjin1357/orca-line-blame",
+  "license": "MIT",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    }
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "id": "blame",
+        "title": "Blame",
+        "extensions": [
+          ".vue",
+          ".ts",
+          ".tsx",
+          ".mts",
+          ".cts",
+          ".js",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+          ".scss",
+          ".css",
+          ".json",
+          ".md",
+          ".html",
+          ".yaml",
+          ".yml",
+          ".sh"
+        ],
+        "entry": "editor/main.ts",
+        "priority": "default",
+        "frame": "isolated"
+      }
+    ]
+  }
+}
