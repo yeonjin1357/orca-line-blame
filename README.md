@@ -40,6 +40,9 @@ It needs Orca 1.4.248 or later, and git.
 
 Open a file as usual, then pick **Blame** in the editor's view switch, next to **Source**. To edit the file, switch back to **Source**.
 
+<img width="142" height="37" alt="image" src="https://github.com/user-attachments/assets/55c6f514-4887-4d08-b90d-b8c61c322bed" />
+
+
 ## Supported files
 
 Almost any source or text file, about 230 file types in all:
