@@ -1,6 +1,7 @@
 import type { BlameCommit, DetailOutput, LineChange } from '../src/protocol'
 import { button, element } from './dom'
 import { dateTime, relativeTime } from './format'
+import { language, text } from './language'
 
 const HIDE_DELAY_MS = 180
 const EDGE_GAP = 8
@@ -29,7 +30,7 @@ export type Card = {
 function changeView(change: LineChange): HTMLElement {
   const view = element('div', 'change')
   view.append(
-    element('div', 'label', change.previousLine === null ? '이 커밋에서 새로 추가된 줄' : '이 커밋에서 바뀐 내용')
+    element('div', 'label', change.previousLine === null ? text.addedInCommit : text.changedInCommit)
   )
   const diff = element('div', 'diff')
   for (const [index, text] of change.removed.entries()) {
@@ -45,7 +46,7 @@ function changeView(change: LineChange): HTMLElement {
   view.append(diff)
   const hidden = change.hiddenRemoved + change.hiddenAdded
   if (hidden > 0) {
-    view.append(element('div', 'label', `같은 자리에서 ${hidden}줄이 더 바뀌었어요`))
+    view.append(element('div', 'label', text.moreLinesChanged(hidden)))
   }
   return view
 }
@@ -156,24 +157,24 @@ export function createCard(host: CardHost): Card {
     const head = element('div', 'head')
     head.append(
       element('span', 'who', commit.author),
-      element('span', 'when', `${relativeTime(commit.time, now)} (${dateTime(commit.time)})`),
+      element('span', 'when', `${relativeTime(commit.time, now, language)} (${dateTime(commit.time, language)})`),
       element('span', 'grow'),
       // Drawn always and shown by the `pinned` class: redrawing the card on the press that pins
       // it would swallow that press.
-      Object.assign(button('✕', '닫기 (Esc)', hide), { className: 'close' })
+      Object.assign(button('✕', text.close, hide), { className: 'close' })
     )
     const parts: HTMLElement[] = [head]
     if (position > 0) {
-      parts.push(element('div', 'label', `이 줄의 ${position}번째 이전 변경`))
+      parts.push(element('div', 'label', text.earlierChangeNumber(position)))
     }
     parts.push(element('div', 'message', detail?.message ?? commit.summary))
 
     if (step.error) {
-      parts.push(element('div', 'label warn', `불러오지 못했어요: ${step.error}`))
+      parts.push(element('div', 'label warn', text.loadFailed(step.error)))
     } else if (!detail) {
-      parts.push(element('div', 'label', '변경 내용 불러오는 중…'))
+      parts.push(element('div', 'label', text.loadingChange))
     } else if (!detail.change) {
-      parts.push(element('div', 'label', '이 커밋의 변경 내용에서 이 줄을 찾지 못했어요 (병합 커밋일 수 있어요)'))
+      parts.push(element('div', 'label', text.lineNotInCommit))
     } else {
       parts.push(changeView(detail.change))
     }
@@ -186,14 +187,14 @@ export function createCard(host: CardHost): Card {
       element('span', 'grow'),
       Object.assign(
         button(
-          '◀ 이전 변경',
-          canGoOlder ? '이 줄을 그 전에 바꾼 커밋 보기' : '이 줄은 이 커밋에서 처음 생겼어요',
+          text.earlierChange,
+          canGoOlder ? text.showEarlierChange : text.firstWrittenHere,
           () => void older()
         ),
         { disabled: !canGoOlder }
       ),
       Object.assign(
-        button('다음 변경 ▶', '더 최근 변경으로 돌아가기', () => {
+        button(text.laterChange, text.backToLaterChange, () => {
           position--
           render()
         }),
