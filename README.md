@@ -40,7 +40,18 @@ It needs Orca 1.4.248 or later, and git.
 
 Open a file as usual, then pick **Blame** in the editor's view switch, next to **Source**. To edit the file, switch back to **Source**.
 
-It works for `.vue`, TypeScript, JavaScript, `.scss`, `.css`, `.json`, `.md`, `.html`, YAML and `.sh` files.
+## Supported files
+
+Almost any source or text file, about 230 file types in all:
+
+- **Web:** Vue, Svelte, Astro, React (`.jsx`, `.tsx`), TypeScript, JavaScript, HTML, CSS, SCSS, Less
+- **Languages:** Python, Java, Kotlin, Scala, Go, Rust, C, C++, C#, Swift, Ruby, PHP, Dart, Elixir, Haskell and more
+- **Scripts and data:** shell, PowerShell, SQL, GraphQL, Protobuf
+- **Config and docs:** JSON, YAML, TOML, XML, Markdown, `Dockerfile`, `Makefile`, `.gitignore`
+
+Most are syntax-coloured. A few, such as Zig and Terraform, are shown as plain text; blame works the same.
+
+Orca has no "every file" option, so each file type is listed by hand. If yours is missing, [open an issue](https://github.com/yeonjin1357/orca-line-blame/issues).
 
 ## About the "Full access" warning
 
@@ -76,7 +87,10 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | `editor/card.ts` | The commit card and stepping through a line's history |
 | `editor/find-bar.ts`, `editor/find.ts` | Find in file |
 | `editor/messages.ts` | Everything the view says, in Korean and in English |
-| `editor/highlight.ts` | Syntax colours, with highlight.js |
+| `editor/highlight.ts` | Syntax colours, with highlight.js: which language each file type is coloured as |
+| `tools/build-grammars.cjs` | Rebuilds `editor/vendor/highlight-languages.min.js`, the grammars highlight.js's common build leaves out |
+
+To add a file type, list it in one of the `customEditors` groups in `orca-plugin.json` (Orca allows 32 suffixes and 32 names per group, which is why Blame is declared several times), then give it a language in `editor/highlight.ts` if highlight.js has one.
 
 The screenshots show a made-up project, not real code.
 

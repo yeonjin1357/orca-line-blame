@@ -1,25 +1,146 @@
 import hljs from './vendor/highlight.min.js'
+import moreGrammars from './vendor/highlight-languages.min.js'
+
+for (const [name, grammar] of Object.entries(moreGrammars)) {
+  hljs.registerLanguage(name, grammar)
+}
 
 /** Past this, colouring would stall the tab: the text is shown plain. */
 const MAX_HIGHLIGHTED_CHARS = 1_500_000
 
-const LANGUAGE_BY_EXTENSION: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'typescript',
-  mts: 'typescript',
-  cts: 'typescript',
-  js: 'javascript',
-  jsx: 'javascript',
-  mjs: 'javascript',
-  cjs: 'javascript',
-  scss: 'scss',
-  css: 'css',
-  json: 'json',
-  md: 'markdown',
-  html: 'xml',
-  yaml: 'yaml',
-  yml: 'yaml',
-  sh: 'bash'
+/**
+ * highlight.js language → the file suffixes coloured with it, without the dot.
+ * A file type Blame opens (orca-plugin.json) that is not here is shown plain.
+ */
+const SUFFIXES_BY_LANGUAGE: Record<string, string> = {
+  typescript: 'ts tsx mts cts',
+  javascript: 'js jsx mjs cjs',
+  xml: 'html htm xhtml xml xsd xsl xslt plist xaml csproj fsproj vbproj props targets jsp razor cshtml ejs',
+  css: 'css pcss',
+  scss: 'scss sass',
+  less: 'less',
+  stylus: 'styl',
+  coffeescript: 'coffee',
+  elm: 'elm',
+  handlebars: 'hbs handlebars mustache',
+  twig: 'twig',
+  django: 'njk jinja j2 liquid',
+  json: 'json jsonc json5',
+  yaml: 'yaml yml',
+  ini: 'ini toml cfg',
+  properties: 'properties',
+  markdown: 'md markdown mdx',
+  asciidoc: 'adoc asciidoc',
+  latex: 'tex sty',
+  gherkin: 'feature',
+  bash: 'sh bash zsh ksh fish',
+  powershell: 'ps1 psm1 psd1',
+  dos: 'bat cmd',
+  awk: 'awk',
+  tcl: 'tcl',
+  vim: 'vim',
+  python: 'py pyi pyw pyx bzl bazel',
+  ruby: 'rb rake gemspec',
+  erb: 'erb',
+  haml: 'haml',
+  php: 'php phtml',
+  perl: 'pl pm',
+  lua: 'lua',
+  r: 'r',
+  julia: 'jl',
+  dart: 'dart',
+  elixir: 'ex exs',
+  erlang: 'erl hrl',
+  haskell: 'hs',
+  ocaml: 'ml mli',
+  sml: 'sml',
+  lisp: 'lisp el',
+  scheme: 'scm rkt',
+  clojure: 'clj cljs cljc edn',
+  java: 'java',
+  kotlin: 'kt kts',
+  scala: 'scala sc',
+  groovy: 'groovy',
+  gradle: 'gradle',
+  csharp: 'cs csx',
+  fsharp: 'fs fsx fsi',
+  vbnet: 'vb',
+  vbscript: 'vbs',
+  c: 'c h',
+  cpp: 'cpp cc cxx hpp hh hxx',
+  arduino: 'ino',
+  objectivec: 'm mm',
+  swift: 'swift',
+  go: 'go',
+  rust: 'rs',
+  nim: 'nim',
+  d: 'd',
+  crystal: 'cr',
+  delphi: 'pas',
+  fortran: 'f90 f95 f for',
+  ada: 'adb ads',
+  haxe: 'hx',
+  vala: 'vala',
+  qml: 'qml',
+  applescript: 'applescript',
+  verilog: 'v sv svh',
+  vhdl: 'vhd vhdl',
+  x86asm: 'asm',
+  llvm: 'll',
+  glsl: 'glsl vert frag',
+  wasm: 'wat',
+  sql: 'sql',
+  pgsql: 'pgsql',
+  graphql: 'graphql graphqls gql',
+  protobuf: 'proto',
+  thrift: 'thrift',
+  http: 'http rest',
+  diff: 'diff patch',
+  nix: 'nix',
+  cmake: 'cmake',
+  makefile: 'mk',
+  dockerfile: 'dockerfile',
+  nginx: 'nginx',
+  puppet: 'pp'
+}
+
+/** highlight.js language → files known by their whole name rather than a suffix, in lower case. */
+const NAMES_BY_LANGUAGE: Record<string, string> = {
+  dockerfile: 'dockerfile containerfile',
+  makefile: 'makefile gnumakefile',
+  cmake: 'cmakelists.txt',
+  groovy: 'jenkinsfile',
+  ruby: 'gemfile rakefile podfile fastfile brewfile vagrantfile',
+  bash: '.bashrc .zshrc .profile .bash_profile',
+  ini: '.editorconfig .gitmodules',
+  json: '.babelrc .eslintrc .prettierrc'
+}
+
+function byFileType(table: Record<string, string>): Map<string, string> {
+  return new Map(
+    Object.entries(table).flatMap(([language, fileTypes]) =>
+      fileTypes.split(' ').map((fileType): [string, string] => [fileType, language])
+    )
+  )
+}
+
+const LANGUAGE_BY_NAME = byFileType(NAMES_BY_LANGUAGE)
+const LANGUAGE_BY_FILE_TYPE = new Map([...byFileType(SUFFIXES_BY_LANGUAGE), ...LANGUAGE_BY_NAME])
+
+/** Markup with `<script>` and `<style>` blocks, each block in a language of its own. */
+const BLOCK_FILE_TYPES = new Set(['vue', 'svelte', 'astro'])
+
+/**
+ * What kind of file a path names: its whole name in lower case when the file is known by name
+ * (`dockerfile`), else its last suffix without the dot (`ts`); empty when it has neither.
+ */
+export function fileTypeOf(path: string): string {
+  const name = path.slice(path.lastIndexOf('/') + 1).toLowerCase()
+  if (LANGUAGE_BY_NAME.has(name)) {
+    return name
+  }
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(dot + 1) : ''
 }
 
 export function escapeHtml(text: string): string {
@@ -75,8 +196,8 @@ function blockLanguage(tag: string, attributes: string): string {
   return lang === 'scss' || lang === 'sass' ? 'scss' : lang === 'less' ? 'less' : 'css'
 }
 
-/** A Vue file is three languages: each top-level block is coloured as its own. */
-function highlightVue(lines: string[]): string[] {
+/** A Vue file is three languages: each top-level block is coloured as its own. Svelte and Astro files likewise. */
+function highlightBlocks(lines: string[]): string[] {
   const out: string[] = []
   let index = 0
   while (index < lines.length) {
@@ -118,19 +239,20 @@ function highlightVue(lines: string[]): string[] {
 const VUE_BLOCK = /^<(template|script|style)\b[^>]*>\s*$/
 
 /** Orca does not say which file is open: until it is found, colour by what the text looks like. */
-export function guessExtension(lines: string[]): string {
+export function guessFileType(lines: string[]): string {
   return lines.some((line) => VUE_BLOCK.test(line)) ? 'vue' : 'ts'
 }
 
-/** One HTML string per line of `lines`, coloured for the file's extension (no dot). */
-export function highlightLines(lines: string[], extension: string): string[] {
+/** One HTML string per line of `lines`, coloured for the file's type (see `fileTypeOf`). */
+export function highlightLines(lines: string[], fileType: string): string[] {
   const size = lines.reduce((total, line) => total + line.length + 1, 0)
   const plain = () => lines.map(escapeHtml)
-  const language = extension === 'vue' ? 'vue' : LANGUAGE_BY_EXTENSION[extension]
-  if (!language || size > MAX_HIGHLIGHTED_CHARS) {
+  const inBlocks = BLOCK_FILE_TYPES.has(fileType)
+  const language = LANGUAGE_BY_FILE_TYPE.get(fileType)
+  if ((!inBlocks && !language) || size > MAX_HIGHLIGHTED_CHARS) {
     return plain()
   }
-  const html = language === 'vue' ? highlightVue(lines) : highlightLinesAs(lines, language)
+  const html = language ? highlightLinesAs(lines, language) : highlightBlocks(lines)
   // A highlighter that lost or gained a line would put every blame on the wrong row.
   return html.length === lines.length ? html : plain()
 }

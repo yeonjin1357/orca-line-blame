@@ -4,7 +4,7 @@ import { button, element } from './dom'
 import { createFindBar } from './find-bar'
 import { relativeTime } from './format'
 import { language, text } from './language'
-import { guessExtension, highlightLines } from './highlight'
+import { fileTypeOf, guessFileType, highlightLines } from './highlight'
 import { describeText, toLines } from './identify'
 import { STYLE } from './style'
 
@@ -34,7 +34,7 @@ scroller.append(linesEl)
 
 let generation = 0
 let lines: string[] = []
-let shownExtension = ''
+let shownFileType = ''
 let matches: FileMatch[] = []
 let match: FileMatch | null = null
 let blame: BlameOutput | null = null
@@ -57,9 +57,9 @@ const findBar = createFindBar({
 })
 document.body.append(bar, scroller, findBar.element, card.element)
 
-function renderLines(extension: string): void {
-  shownExtension = extension
-  const html = highlightLines(lines, extension)
+function renderLines(fileType: string): void {
+  shownFileType = fileType
+  const html = highlightLines(lines, fileType)
   linesEl.innerHTML = html
     .map(
       (code, index) =>
@@ -175,9 +175,9 @@ function showCard(): void {
 async function useMatch(next: FileMatch, run: number): Promise<void> {
   match = next
   blame = null
-  const extension = next.path.includes('.') ? next.path.slice(next.path.lastIndexOf('.') + 1).toLowerCase() : ''
-  if (extension !== shownExtension) {
-    renderLines(extension)
+  const fileType = fileTypeOf(next.path)
+  if (fileType !== shownFileType) {
+    renderLines(fileType)
   }
   setNotice(text.loadingBlame)
   try {
@@ -201,7 +201,7 @@ async function show(content: string): Promise<void> {
   matches = []
   match = null
   blame = null
-  renderLines(guessExtension(lines))
+  renderLines(guessFileType(lines))
   setNotice(text.findingFile)
   try {
     const context = await orca.host.call('workspace.readContext').catch(() => null)

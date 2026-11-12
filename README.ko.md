@@ -40,7 +40,18 @@ Orca 1.4.248 이상과 git이 필요합니다.
 
 평소처럼 파일을 연 뒤, 편집기의 보기 전환에서 **소스** 옆의 **Blame**을 고릅니다. 파일을 고치려면 다시 **소스**로 돌아가면 됩니다.
 
-`.vue`, TypeScript, JavaScript, `.scss`, `.css`, `.json`, `.md`, `.html`, YAML, `.sh` 파일에서 쓸 수 있습니다.
+## 지원하는 파일
+
+거의 모든 소스·텍스트 파일에서 쓸 수 있습니다. 모두 230가지쯤 됩니다.
+
+- **웹:** Vue, Svelte, Astro, React(`.jsx`, `.tsx`), TypeScript, JavaScript, HTML, CSS, SCSS, Less
+- **언어:** Python, Java, Kotlin, Scala, Go, Rust, C, C++, C#, Swift, Ruby, PHP, Dart, Elixir, Haskell 등
+- **스크립트·데이터:** 셸, PowerShell, SQL, GraphQL, Protobuf
+- **설정·문서:** JSON, YAML, TOML, XML, Markdown, `Dockerfile`, `Makefile`, `.gitignore`
+
+대부분 문법 색상이 입혀집니다. Zig, Terraform 같은 몇 가지는 색 없이 나오지만 기록 조회는 똑같이 됩니다.
+
+Orca에는 "모든 파일"을 한 번에 지정하는 방법이 없어서 파일 종류를 하나씩 등록했습니다. 빠진 게 있으면 [이슈](https://github.com/yeonjin1357/orca-line-blame/issues)로 알려 주세요.
 
 ## "전체 액세스" 경고에 대해
 
