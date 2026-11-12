@@ -90,7 +90,7 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | `editor/highlight.ts` | Syntax colours, with highlight.js: which language each file type is coloured as |
 | `tools/build-grammars.cjs` | Rebuilds `editor/vendor/highlight-languages.min.js`, the grammars highlight.js's common build leaves out |
 
-To add a file type, list it in one of the `customEditors` groups in `orca-plugin.json` (Orca allows 32 suffixes and 32 names per group, which is why Blame is declared several times), then give it a language in `editor/highlight.ts` if highlight.js has one.
+To add a file type, list it in one of the `customEditors` groups in `orca-plugin.json`, then give it a language in `editor/highlight.ts` if highlight.js has one. Blame is declared several times because the catalog refuses a release when one group's file types, joined with `, `, run past 160 characters. Before tagging a release, commit and run `orca plugin release-entry .`: it fails the way the catalog would.
 
 The screenshots show a made-up project, not real code.
 

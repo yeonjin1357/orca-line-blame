@@ -56,3 +56,13 @@ test('opens files of languages beyond the web ones, and files known by name', ()
   assert.ok(filenames.includes('Dockerfile'))
   assert.ok(filenames.includes('Makefile'))
 })
+
+// A catalog entry describes an editor by its file types joined with ", " and drops an editor whose
+// description is longer than 160 characters; the release is then refused as not matching its listing.
+test('describes each editor in the 160 characters a catalog entry allows', () => {
+  const tooLong = editors
+    .map((editor) => ({ id: editor.id, length: [...(editor.extensions ?? []), ...(editor.filenames ?? [])].join(', ').length }))
+    .filter((editor) => editor.length > 160)
+
+  assert.deepEqual(tooLong, [])
+})
