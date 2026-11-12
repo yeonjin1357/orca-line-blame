@@ -75,6 +75,8 @@ orca plugin dev load .      # load this folder into Orca (the first time needs -
 orca plugin dev reload .    # after a change
 ```
 
+Every push to `main` and every pull request also runs the tests on macOS, Linux and Windows (`.github/workflows/tests.yml`). Those machines have no Orca, so the tests are bundled with `tools/orca-testing-stand-in.mjs` in place of `orca/testing`; `orca plugin test .` on your own machine stays the reference.
+
 Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` from a place that has `typescript` and `@types/node`; this repository keeps no `node_modules`.
 
 | Path | What it holds |
@@ -92,7 +94,7 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | `editor/highlight.ts` | Syntax colours, with highlight.js: which language each file type is coloured as |
 | `tools/build-grammars.cjs` | Rebuilds `editor/vendor/highlight-languages.min.js`, the grammars highlight.js's common build leaves out |
 
-To add a file type, list it in one of the `customEditors` groups in `orca-plugin.json`, then give it a language in `editor/highlight.ts` if highlight.js has one. Blame is declared several times because the catalog refuses a release when one group's file types, joined with `, `, run past 160 characters. Before tagging a release, commit and run `orca plugin release-entry .`: it fails the way the catalog would.
+To add a file type, list it in one of the `customEditors` groups in `orca-plugin.json`, then give it a language in `editor/highlight.ts` if highlight.js has one. Blame is declared several times because the catalog refuses a release when one group's file types, joined with `, `, run past 160 characters. Before tagging a release, commit and run `orca plugin release-entry .`: it fails the way the catalog would. Then push, and tag once the tests are green on all three systems.
 
 The screenshots show a made-up project, not real code.
 

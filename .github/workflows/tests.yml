@@ -1,0 +1,44 @@
+name: tests
+
+# The plugin is written on Windows; this runs its tests on macOS and Linux too, where paths, file
+# names and git behave differently. Tag a release only after this run is green.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Where this runs
+        run: |
+          sw_vers 2>/dev/null || uname -sr
+          git --version
+          node -v
+      # These machines have no Orca: the tests are bundled with a stand-in for `orca/testing`.
+      - name: Bundle the tests
+        run: >
+          npx --yes esbuild@0.25.10 src/*.test.ts editor/*.test.ts
+          --bundle --platform=node --format=esm
+          --outdir=.orca/tests --outbase=.
+          --alias:orca/testing=./tools/orca-testing-stand-in.mjs
+      - name: Run the tests
+        run: |
+          cp orca-plugin.json .orca/tests/
+          cd .orca/tests
+          node --test $(find . -name '*.test.js' | sort)
