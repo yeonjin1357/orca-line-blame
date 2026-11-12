@@ -2,8 +2,8 @@
   "manifestVersion": 2,
   "id": "line-blame",
   "name": "Line Blame",
-  "version": "0.1.5",
-  "description": "See who changed a line, when and why, without leaving Orca. Click a line for its commit, then step back through the commits that changed it before.",
+  "version": "0.1.6",
+  "description": "Git blame for each line, GitLens style: click a line to see who changed it, when and why, then step back through the commits that changed it before.",
   "icon": "images/icon.png",
   "cover": {
     "path": "images/cover.png",
