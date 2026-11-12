@@ -3,11 +3,14 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { parseBlame } from './blame'
 import { lineChange, parseHunks } from './change'
 import { git } from './git'
-import { locateIn, type Workspace } from './locate'
-import type { FileRevision } from './protocol'
+import { locateChanged, locateCommitted, type Repository } from './locate'
+import type { FileMatch, FileRevision, LocateInput } from './protocol'
+import { nestedRepositories } from './repositories'
 
-/** Workspaces searched after the focused one, so an odd setup cannot stall a file open. */
-const MAX_OTHER_WORKSPACES = 8
+/** Repositories beyond the focused workspace searched for an edited or new file: that takes a slow `git status` each. */
+const MAX_OTHER_REPOSITORIES_FOR_CHANGES = 8
+/** Repositories searched at the same time. */
+const SEARCHED_AT_ONCE = 8
 /** `hostId` of workspaces on this machine; any other is on a host git here cannot reach. */
 const LOCAL_HOST_IDS: readonly (string | null)[] = [null, 'local']
 /** The tree with no files: diffing from it shows a commit's first version of a file as all new. */
@@ -43,6 +46,9 @@ function revision(value: FileRevision): FileRevision {
   return { sha: commitId(value?.sha), path: insidePath(value?.path) }
 }
 
+type Workspace = { name: string; path: string; branch: string | null }
+type Search = (repository: Repository, input: LocateInput) => Promise<FileMatch[]>
+
 function shortBranch(branch: string | null | undefined): string {
   return (branch ?? '').replace(/^refs\/heads\//, '')
 }
@@ -55,31 +61,78 @@ export default function activate(orca: OrcaWorkerApi) {
       .map(({ name, path: root, branch }) => ({ name, path: root, branch }))
   }
 
-  /** Requests name a workspace root; only roots Orca itself lists are ever handed to git. */
+  /** Each workspace followed by the repositories found inside it, none twice. */
+  async function repositoriesOf(list: Workspace[]): Promise<Repository[]> {
+    const groups = await Promise.all(
+      list.map(async (workspace) => {
+        const nested = await nestedRepositories(workspace.path).catch((): string[] => [])
+        const inside = (root: string) => path.relative(workspace.path, root).split(path.sep).join('/')
+        return [
+          { root: workspace.path, name: workspace.name },
+          ...nested.map((root) => ({ root, name: `${workspace.name}/${inside(root)}` }))
+        ]
+      })
+    )
+    const seen = new Set<string>()
+    return groups.flat().filter(({ root }) => {
+      const key = path.resolve(root)
+      if (seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
+  }
+
+  /** Requests name a repository; only workspaces Orca lists, and repositories inside them, are ever handed to git. */
   async function knownRoot(root: unknown): Promise<string> {
-    const match = (await workspaces()).find((workspace) => workspace.path === root)
+    const known = typeof root === 'string' ? await repositoriesOf(await workspaces()) : []
+    const match = known.find((repository) => path.resolve(repository.root) === path.resolve(root as string))
     if (!match) {
-      throw invalid('not a workspace Orca lists')
+      throw invalid('not a workspace Orca lists, nor a repository inside one')
     }
-    return match.path
+    return match.root
+  }
+
+  /** The matches of the first repository, in order, that has any; several repositories are searched at once. */
+  async function firstMatches(repositories: Repository[], search: Search, input: LocateInput): Promise<FileMatch[]> {
+    for (let start = 0; start < repositories.length; start += SEARCHED_AT_ONCE) {
+      const found = await Promise.all(
+        repositories.slice(start, start + SEARCHED_AT_ONCE).map((repository) =>
+          // A folder workspace that is not a git repository answers with git's error: no match there.
+          search(repository, input).catch((): FileMatch[] => [])
+        )
+      )
+      const matches = found.find((each) => each.length > 0)
+      if (matches) {
+        return matches
+      }
+    }
+    return []
   }
 
   orca.panels.handle('locate', async (input) => {
     const all = await workspaces()
     const branch = shortBranch(input.context?.branch)
-    const focused = all.filter((workspace) => input.context !== null && shortBranch(workspace.branch) === branch)
-    const others = all.filter((workspace) => !focused.includes(workspace)).slice(0, MAX_OTHER_WORKSPACES)
-    for (const workspace of [...focused, ...others]) {
-      try {
-        const matches = await locateIn(workspace, input)
-        if (matches.length > 0) {
-          return { matches }
-        }
-      } catch (error) {
-        // A folder workspace that is not a git repository: skip it.
-        orca.log(`locate skipped ${workspace.path}: ${(error as Error).message}`)
+    const focused = await repositoriesOf(
+      all.filter((workspace) => input.context !== null && shortBranch(workspace.branch) === branch)
+    )
+    const others = (await repositoriesOf(all)).filter((repository) => !focused.some((each) => each.root === repository.root))
+    // The focused workspace first. Elsewhere, an unchanged file is found through git's index, which is
+    // cheap enough for every repository; an edited or new one needs `git status`, so only a few are asked.
+    const searches: [Repository[], Search][] = [
+      [focused, locateCommitted],
+      [focused, locateChanged],
+      [others, locateCommitted],
+      [others.slice(0, MAX_OTHER_REPOSITORIES_FOR_CHANGES), locateChanged]
+    ]
+    for (const [repositories, search] of searches) {
+      const matches = await firstMatches(repositories, search, input)
+      if (matches.length > 0) {
+        return { matches }
       }
     }
+    orca.log(`locate: no file with this text in ${focused.length + others.length} repositories`)
     return { matches: [] }
   })
 

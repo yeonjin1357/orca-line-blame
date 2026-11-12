@@ -8,17 +8,19 @@ const MAX_CHANGED_FILES = 3000
 /** A source file larger than this is never the open text. */
 const MAX_COMPARED_BYTES = 8 * 1024 * 1024
 
-export type Workspace = { name: string; path: string; branch: string | null }
+/** A git repository to search: a workspace, or a repository inside one. `name` is shown to the user. */
+export type Repository = { root: string; name: string }
 
-type IndexCache = { mtimeMs: number; byBlob: Map<string, string[]> }
+type IndexCache = { indexPath: string; mtimeMs: number; byBlob: Map<string, string[]> }
 
 const indexCaches = new Map<string, IndexCache>()
 
 /** Every tracked file by the blob git holds for it; rebuilt only when the index file changes. */
 async function trackedByBlob(root: string): Promise<Map<string, string[]>> {
-  const indexPath = path.resolve(root, (await git(root, ['rev-parse', '--git-path', 'index'])).trim())
-  const { mtimeMs } = await stat(indexPath)
   const cached = indexCaches.get(root)
+  // Asking git where the index is costs a process: once per repository is enough.
+  const indexPath = cached?.indexPath ?? path.resolve(root, (await git(root, ['rev-parse', '--git-path', 'index'])).trim())
+  const { mtimeMs } = await stat(indexPath)
   if (cached && cached.mtimeMs === mtimeMs) {
     return cached.byBlob
   }
@@ -36,7 +38,7 @@ async function trackedByBlob(root: string): Promise<Map<string, string[]>> {
       byBlob.set(blob, [record.slice(tab + 1)])
     }
   }
-  indexCaches.set(root, { mtimeMs, byBlob })
+  indexCaches.set(root, { indexPath, mtimeMs, byBlob })
   return byBlob
 }
 
@@ -61,50 +63,43 @@ async function changedPaths(root: string): Promise<string[]> {
   return paths
 }
 
-/**
- * The files of `workspace` whose text is the one the frame describes. Orca gives an editor no
- * path, so the text is matched instead: against git's index when the file is unchanged, and
- * against the content of changed and new files otherwise.
- */
-export async function locateIn(workspace: Workspace, input: LocateInput): Promise<FileMatch[]> {
-  const toMatch = (state: FileMatch['state']) => (file: string): FileMatch => ({
-    root: workspace.path,
-    workspaceName: workspace.name,
-    path: file,
-    state
-  })
-  const [changed, tracked] = await Promise.all([changedPaths(workspace.path), trackedByBlob(workspace.path)])
-  const changedSet = new Set(changed)
-  const committed = new Set<string>()
-  for (const id of input.blobIds) {
-    for (const file of tracked.get(id) ?? []) {
-      // The index still holds the old blob of a file edited since: it is not this text.
-      if (!changedSet.has(file)) {
-        committed.add(file)
-      }
-    }
-  }
-  if (committed.size > 0) {
-    return [...committed].sort().map(toMatch('committed'))
-  }
-  if (changed.length > MAX_CHANGED_FILES) {
-    return []
-  }
-  const matches: string[] = []
-  await Promise.all(
-    changed.map(async (file) => {
+/** The files among `files` whose content on disk is the text the frame describes. */
+async function withThisText(root: string, files: string[], input: LocateInput): Promise<string[]> {
+  const same = await Promise.all(
+    files.map(async (file) => {
       try {
-        const absolute = path.join(workspace.path, file)
-        if ((await stat(absolute)).size > MAX_COMPARED_BYTES) {
-          return
-        }
-        if (canonicalBlobId(await readFile(absolute)) === input.canonicalId) {
-          matches.push(file)
-        }
+        const absolute = path.join(root, file)
+        return (await stat(absolute)).size <= MAX_COMPARED_BYTES && canonicalBlobId(await readFile(absolute)) === input.canonicalId
       } catch {
-        // Deleted or unreadable between `git status` and now: not the open file.
+        // Deleted or unreadable since git listed it: not the open file.
+        return false
       }
     })
   )
-  return matches.sort().map(toMatch('changed'))
+  return files.filter((_, index) => same[index]).sort()
+}
+
+function matchesIn(repository: Repository, files: string[], state: FileMatch['state']): FileMatch[] {
+  return files.map((file) => ({ root: repository.root, workspaceName: repository.name, path: file, state }))
+}
+
+/**
+ * The unchanged files of `repository` whose text is the one the frame describes. Orca gives an
+ * editor no path, so the text is matched instead, here against the blobs in git's index. This is
+ * the cheap search: no `git status`, so it can run over every repository.
+ */
+export async function locateCommitted(repository: Repository, input: LocateInput): Promise<FileMatch[]> {
+  const tracked = await trackedByBlob(repository.root)
+  const candidates = [...new Set(input.blobIds.flatMap((id) => tracked.get(id) ?? []))]
+  // The index still holds the old blob of a file edited since: on disk it is no longer this text.
+  return matchesIn(repository, await withThisText(repository.root, candidates, input), 'committed')
+}
+
+/** The edited and new files of `repository` whose text is the one the frame describes. */
+export async function locateChanged(repository: Repository, input: LocateInput): Promise<FileMatch[]> {
+  const changed = await changedPaths(repository.root)
+  if (changed.length > MAX_CHANGED_FILES) {
+    return []
+  }
+  return matchesIn(repository, await withThisText(repository.root, changed, input), 'changed')
 }

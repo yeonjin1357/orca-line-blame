@@ -16,8 +16,10 @@ export type TestRepo = {
   dispose(): void
 }
 
-export function createRepo(): TestRepo {
-  const root = mkdtempSync(path.join(tmpdir(), 'line-blame-test-'))
+/** A new repository in a folder of its own, or at `at` (created if missing). */
+export function createRepo(at?: string): TestRepo {
+  const root = at ?? mkdtempSync(path.join(tmpdir(), 'line-blame-test-'))
+  mkdirSync(root, { recursive: true })
   let commits = 0
   const git = (...args: string[]): string =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim()

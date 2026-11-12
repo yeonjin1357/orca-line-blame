@@ -1,4 +1,5 @@
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, assert, mockHost, mountWorker, test } from 'orca/testing'
 import type { LocateInput } from './protocol'
 import { createRepo, type TestRepo } from './test-repo'
@@ -6,8 +7,8 @@ import * as worker from './worker'
 
 const repos: TestRepo[] = []
 
-function repo(): TestRepo {
-  const created = createRepo()
+function repo(at?: string): TestRepo {
+  const created = createRepo(at)
   repos.push(created)
   return created
 }
@@ -264,6 +265,94 @@ test('refuses a revision that is not a full commit id, so it can never be read a
 
   await assert.rejects(
     mounted.request('lineBlame', { root: main.root, revision: { sha: '--output=owned', path: 'src/a.ts' }, line: 1 }),
+    rejectsWith('invalid_params')
+  )
+})
+
+/** A workspace that ignores its `vendor` folder, and a repository of its own cloned into `vendor/api`. */
+function workspaceWithClone(): { outer: TestRepo; inner: TestRepo } {
+  const outer = repo()
+  outer.write('.gitignore', 'vendor\n')
+  outer.write('README.md', 'outer\n')
+  outer.commit('first')
+  const inner = repo(path.join(outer.root, 'vendor', 'api'))
+  inner.write('src/Main.java', 'class Main {}\n')
+  inner.commit('first')
+  return { outer, inner }
+}
+
+test('locate finds a file of a repository that sits inside a workspace, such as a clone it ignores', async () => {
+  const { outer, inner } = workspaceWithClone()
+  const mounted = await mount([{ name: 'Outer', root: outer.root, branch: 'main' }])
+
+  const { matches } = await mounted.request('locate', describe(inner, 'class Main {}\n'))
+
+  assert.deepEqual(matches, [{ root: inner.root, workspaceName: 'Outer/vendor/api', path: 'src/Main.java', state: 'committed' }])
+})
+
+test('locate finds an edited file of a repository inside the focused workspace', async () => {
+  const { outer, inner } = workspaceWithClone()
+  inner.write('src/Main.java', 'class Main { int edited; }\n')
+  const mounted = await mount([{ name: 'Outer', root: outer.root, branch: 'main' }])
+
+  const { matches } = await mounted.request('locate', describe(inner, 'class Main { int edited; }\n'))
+
+  assert.deepEqual(matches, [{ root: inner.root, workspaceName: 'Outer/vendor/api', path: 'src/Main.java', state: 'changed' }])
+})
+
+test('locate answers from a repository inside the focused workspace before another workspace with the same text', async () => {
+  const other = repo()
+  other.write('src/Main.java', 'class Main {}\n')
+  other.commit('first')
+  const { outer } = workspaceWithClone()
+  const mounted = await mount([
+    { name: 'Other', root: other.root, branch: 'release' },
+    { name: 'Focused', root: outer.root, branch: 'main' }
+  ])
+
+  const { matches } = await mounted.request('locate', describe(other, 'class Main {}\n', 'main'))
+
+  assert.deepEqual(
+    matches.map((match) => match.workspaceName),
+    ['Focused/vendor/api']
+  )
+})
+
+test('locate searches every workspace, however many Orca lists and whichever is focused', async () => {
+  const last = repo()
+  last.write('src/a.ts', 'in the last workspace\n')
+  last.commit('first')
+  const before = Array.from({ length: 12 }, (_, index) => {
+    const created = repo()
+    created.write('src/a.ts', `workspace ${index}\n`)
+    created.commit('first')
+    return { name: `Workspace ${index}`, root: created.root, branch: 'main' }
+  })
+  const mounted = await mount([...before, { name: 'Last', root: last.root, branch: 'main' }])
+
+  const { matches } = await mounted.request('locate', describe(last, 'in the last workspace\n', null))
+
+  assert.deepEqual(
+    matches.map((match) => match.workspaceName),
+    ['Last']
+  )
+})
+
+test('blame reads a file of a repository inside a workspace', async () => {
+  const { outer, inner } = workspaceWithClone()
+  const mounted = await mount([{ name: 'Outer', root: outer.root, branch: 'main' }])
+
+  const blame = await mounted.request('blame', { root: inner.root, path: 'src/Main.java' })
+
+  assert.equal(blame.commits[blame.lines[0]].summary, 'first')
+})
+
+test('refuses a folder inside a workspace that is not a repository', async () => {
+  const { outer } = workspaceWithClone()
+  const mounted = await mount([{ name: 'Outer', root: outer.root, branch: 'main' }])
+
+  await assert.rejects(
+    mounted.request('blame', { root: path.join(outer.root, 'vendor'), path: 'api/src/Main.java' }),
     rejectsWith('invalid_params')
   )
 })

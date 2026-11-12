@@ -63,6 +63,7 @@ Orca shows this warning when you install the plugin, because Line Blame starts i
 - **"Earlier change" is a best guess.** Git does not record which old line became which new line, so the plugin follows the most similar one. For a line that was rewritten from scratch it can follow the wrong line.
 - **Language.** The view is in Korean when Orca is, and in English otherwise.
 - **Local workspaces only.** Git runs on the computer Orca runs on.
+- **Repositories inside a workspace.** A repository cloned into a workspace folder, or a submodule, is searched too, up to two folders deep.
 
 <details>
 <summary>For contributors</summary>
@@ -80,6 +81,7 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | --- | --- |
 | `src/worker.ts` | The background program: answers the view's requests and checks their input |
 | `src/locate.ts` | Finding which file an open text belongs to |
+| `src/repositories.ts` | Finding repositories that sit inside a workspace |
 | `src/blame.ts` | Reading `git blame --porcelain` |
 | `src/change.ts` | Reading `git diff -U0`: what a commit did to one line and which line it replaced |
 | `src/protocol.ts` | The types the view and the background program exchange |
