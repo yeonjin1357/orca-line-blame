@@ -7,14 +7,28 @@ export const STYLE = `
   --lb-current: color-mix(in srgb, var(--orca-accent) 70%, var(--orca-background));
   --lb-removed: rgb(255 129 130 / 0.3); --lb-added: rgb(74 194 107 / 0.3);
   --lb-match: rgb(255 213 0 / 0.45); --lb-match-current: rgb(255 140 0 / 0.75);
+  --lb-scroll: rgb(100 100 100 / 0.4); --lb-scroll-hover: rgb(100 100 100 / 0.7);
+  --lb-scroll-active: rgb(0 0 0 / 0.6);
+  color-scheme: light;
 }
 html.dark {
   --lb-keyword: #ff7b72; --lb-string: #a5d6ff; --lb-comment: #8b949e; --lb-number: #79c0ff;
   --lb-function: #d2a8ff; --lb-tag: #7ee787; --lb-builtin: #ffa657;
   --lb-removed: rgb(248 81 73 / 0.22); --lb-added: rgb(63 185 80 / 0.22);
   --lb-match: rgb(234 179 8 / 0.35); --lb-match-current: rgb(249 115 22 / 0.7);
+  --lb-scroll: rgb(121 121 121 / 0.4); --lb-scroll-hover: rgb(100 100 100 / 0.7);
+  --lb-scroll-active: rgb(191 191 191 / 0.4);
+  color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; }
+/* Scrollbars as Orca's own editor draws them: a translucent slider and no track or arrows. */
+::-webkit-scrollbar { width: 14px; height: 14px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-thumb { background: var(--lb-scroll); }
+::-webkit-scrollbar-thumb:hover { background: var(--lb-scroll-hover); }
+::-webkit-scrollbar-thumb:active { background: var(--lb-scroll-active); }
+#card ::-webkit-scrollbar, #card::-webkit-scrollbar { width: 10px; height: 10px; }
 body {
   display: flex; flex-direction: column; overflow: hidden; position: relative;
   background: var(--orca-background); color: var(--orca-foreground);
