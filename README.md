@@ -4,14 +4,14 @@ A read-only code view for [Orca](https://github.com/stablyai/orca) that answers 
 
 It is made for reading, not editing: tracing when a problem was introduced while agents do the writing.
 
-> The interface text is Korean for now.
+The view speaks Korean when Orca's interface language is Korean, and English otherwise.
 
 ## What it does
 
 - **Click a line, or move with ↑ / ↓.** The end of the line shows `author, how long ago • commit title`.
 - **Hover that text.** A card shows the whole commit message and what that commit did to the line: the lines it removed and added.
-- **◀ 이전 변경 (earlier change).** Steps back to the commit that changed the line before that, down to the commit that first wrote it. **다음 변경 ▶** steps forward again. Press anywhere in the card to pin it; Esc or a press outside closes it.
-- **Ctrl+F, or the 찾기 button.** Find in file. Enter and Shift+Enter move between matches, and the line you land on shows its blame.
+- **◀ Earlier change.** Steps back to the commit that changed the line before that, down to the commit that first wrote it. **Later change ▶** steps forward again. Press anywhere in the card to pin it; Esc or a press outside closes it.
+- **Ctrl+F, or the Find button.** Find in file. Enter and Shift+Enter move between matches, and the line you land on shows its blame.
 
 It registers as the `Blame` view for `.vue`, TypeScript, JavaScript, `.scss`, `.css`, `.json`, `.md`, `.html`, YAML and `.sh` files. To edit a file, switch the view back to Source.
 
@@ -54,11 +54,12 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | `editor/main.ts` | The view: code lines, the blame text, the summary bar |
 | `editor/card.ts` | The commit card and stepping through a line's history |
 | `editor/find-bar.ts`, `editor/find.ts` | Find in file |
+| `editor/messages.ts` | Everything the view says, in Korean and in English |
 | `editor/highlight.ts` | Syntax colours, with [highlight.js](https://highlightjs.org/) (BSD-3-Clause, copied into `editor/vendor/`) |
 
 ## 한국어
 
-Orca 안에서 "이 줄을 누가, 언제, 어떤 커밋으로 고쳤는지" 바로 보는 읽기 전용 코드 보기입니다.
+Orca 안에서 "이 줄을 누가, 언제, 어떤 커밋으로 고쳤는지" 바로 보는 읽기 전용 코드 보기입니다. Orca 언어가 한국어면 한국어로, 그 외에는 영어로 표시됩니다.
 
 - **줄 클릭 / ↑↓:** 줄 끝에 `사람, 얼마 전 • 커밋 제목`이 뜹니다.
 - **그 글씨에 마우스 올리기:** 커밋 메시지 전체와, 그 커밋이 그 줄을 어떻게 바꿨는지(변경 전/후)를 보여주는 카드가 뜹니다.

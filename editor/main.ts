@@ -3,6 +3,7 @@ import { createCard } from './card'
 import { button, element } from './dom'
 import { createFindBar } from './find-bar'
 import { relativeTime } from './format'
+import { language, text } from './language'
 import { guessExtension, highlightLines } from './highlight'
 import { describeText, toLines } from './identify'
 import { STYLE } from './style'
@@ -86,8 +87,8 @@ function updateAnnotation(): void {
   annotation.textContent = !commit
     ? notice
     : isCommitted(commit)
-      ? `${commit.author}, ${relativeTime(commit.time, nowSeconds())} • ${commit.summary}`
-      : '아직 커밋되지 않은 변경'
+      ? `${commit.author}, ${relativeTime(commit.time, nowSeconds(), language)} • ${commit.summary}`
+      : text.notCommitted
 }
 
 /** Makes line `index` (from 0) the current one; `reveal` says where to scroll it to, if at all. */
@@ -115,12 +116,12 @@ function summarize(result: BlameOutput): string {
     null
   )
   const authors = new Set(committed.map((commit) => commit.mail || commit.author)).size
-  const parts = [`작성자 ${authors}명`]
+  const parts = [text.authors(authors)]
   if (latest) {
-    parts.push(`마지막 변경 ${latest.author}, ${relativeTime(latest.time, nowSeconds())}`)
+    parts.push(text.lastChange(latest.author, relativeTime(latest.time, nowSeconds(), language)))
   }
   if (committed.length < result.commits.length) {
-    parts.push('커밋 전 변경 있음')
+    parts.push(text.hasUncommittedChanges)
   }
   return parts.join(' · ')
 }
@@ -129,7 +130,7 @@ function renderBar(): void {
   bar.replaceChildren()
   if (matches.length > 1) {
     const picker = element('select')
-    picker.title = '내용이 같은 파일이 여러 개예요. 보고 있는 파일을 골라 주세요.'
+    picker.title = text.pickFile
     for (const [index, candidate] of matches.entries()) {
       const option = element('option', undefined, `${candidate.path} — ${candidate.workspaceName}`)
       option.value = String(index)
@@ -146,7 +147,7 @@ function renderBar(): void {
   } else if (blame) {
     bar.append(element('span', 'summary', summarize(blame)))
   }
-  bar.append(element('span', 'grow'), button('찾기', '파일 안에서 찾기 (Ctrl+F)', openFind))
+  bar.append(element('span', 'grow'), button(text.find, text.findInFile, openFind))
 }
 
 function setNotice(text: string, isError = false): void {
@@ -178,7 +179,7 @@ async function useMatch(next: FileMatch, run: number): Promise<void> {
   if (extension !== shownExtension) {
     renderLines(extension)
   }
-  setNotice('blame 불러오는 중…')
+  setNotice(text.loadingBlame)
   try {
     const result = await orca.plugin.request('blame', { root: next.root, path: next.path })
     if (run !== generation || match !== next) {
@@ -188,24 +189,25 @@ async function useMatch(next: FileMatch, run: number): Promise<void> {
     setNotice('')
   } catch (error) {
     if (run === generation && match === next) {
-      setNotice(`blame 실패: ${(error as Error).message}`, true)
+      setNotice(text.blameFailed((error as Error).message), true)
     }
   }
 }
 
-async function show(text: string): Promise<void> {
+/** Shows a file's text, then finds which file it is and loads its blame. */
+async function show(content: string): Promise<void> {
   const run = ++generation
-  lines = toLines(text)
+  lines = toLines(content)
   matches = []
   match = null
   blame = null
   renderLines(guessExtension(lines))
-  setNotice('파일 찾는 중…')
+  setNotice(text.findingFile)
   try {
     const context = await orca.host.call('workspace.readContext').catch(() => null)
     const located = await orca.plugin.request('locate', {
       context: context && { branch: context.branch, displayName: context.displayName },
-      ...(await describeText(text))
+      ...(await describeText(content))
     })
     if (run !== generation) {
       return
@@ -213,12 +215,12 @@ async function show(text: string): Promise<void> {
     matches = located.matches
   } catch (error) {
     if (run === generation) {
-      setNotice(`파일 찾기 실패: ${(error as Error).message}`, true)
+      setNotice(text.findFileFailed((error as Error).message), true)
     }
     return
   }
   if (matches.length === 0) {
-    setNotice('워크스페이스에서 이 파일을 찾지 못했어요', true)
+    setNotice(text.fileNotFound, true)
     return
   }
   await useMatch(matches[0], run)

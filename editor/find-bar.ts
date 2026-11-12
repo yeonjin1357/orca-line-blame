@@ -1,5 +1,6 @@
 import { button, element } from './dom'
 import { findMatches, type Match } from './find'
+import { text } from './language'
 
 /** Matches coloured at once; past this only the count and the stepping keep up. */
 const MAX_PAINTED_MATCHES = 2000
@@ -55,10 +56,10 @@ export function createFindBar(host: FindHost): FindBar {
   bar.hidden = true
   const input = element('input')
   input.type = 'text'
-  input.placeholder = '찾기'
+  input.placeholder = text.find
   input.spellcheck = false
   const count = element('span', 'count')
-  const caseButton = button('Aa', '대소문자 구분', () => {
+  const caseButton = button('Aa', text.matchCase, () => {
     caseSensitive = !caseSensitive
     caseButton.classList.toggle('on', caseSensitive)
     search()
@@ -67,9 +68,9 @@ export function createFindBar(host: FindHost): FindBar {
     input,
     count,
     caseButton,
-    button('↑', '이전 (Shift+Enter)', () => step(-1)),
-    button('↓', '다음 (Enter)', () => step(1)),
-    button('✕', '닫기 (Esc)', () => close())
+    button('↑', text.previousMatch, () => step(-1)),
+    button('↓', text.nextMatch, () => step(1)),
+    button('✕', text.close, () => close())
   )
 
   let caseSensitive = false
@@ -84,7 +85,7 @@ export function createFindBar(host: FindHost): FindBar {
   }
 
   function paint(): void {
-    count.textContent = matches.length === 0 ? (input.value ? '결과 없음' : '') : `${current + 1}/${matches.length}`
+    count.textContent = matches.length === 0 ? (input.value ? text.noResults : '') : `${current + 1}/${matches.length}`
     bar.classList.toggle('empty', input.value !== '' && matches.length === 0)
     if (!highlights) {
       return
