@@ -2,8 +2,30 @@
   "manifestVersion": 2,
   "id": "line-blame",
   "name": "Line Blame",
-  "version": "0.1.0",
-  "description": "Read-only code view that shows who last changed the line you click, when and in which commit, and walks back through the commits that changed it before.",
+  "version": "0.1.1",
+  "description": "See who changed a line, when and why, without leaving Orca. Click a line for its commit, then step back through the commits that changed it before.",
+  "icon": "images/icon.png",
+  "cover": {
+    "path": "images/cover.png",
+    "alt": "A code file in the Blame view: the clicked line shows its author, date and commit title, and a card shows what that commit changed."
+  },
+  "screenshots": [
+    {
+      "path": "images/screenshot-blame.png",
+      "alt": "The clicked line shows who changed it and when; a card shows the commit message and the line before and after.",
+      "caption": "Click a line to see who changed it. Hover to see what the commit changed."
+    },
+    {
+      "path": "images/screenshot-history.png",
+      "alt": "The card pinned on an earlier change of the same line, with buttons to step earlier and later.",
+      "caption": "Step back through every commit that changed the line."
+    },
+    {
+      "path": "images/screenshot-find.png",
+      "alt": "The find bar open with every match highlighted in the file.",
+      "caption": "Find in the file; each match shows its blame."
+    }
+  ],
   "author": {
     "name": "yeonjin1357",
     "url": "https://github.com/yeonjin1357"
