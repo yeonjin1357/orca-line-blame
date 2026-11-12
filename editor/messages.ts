@@ -14,7 +14,7 @@ export type Messages = {
   hasUncommittedChanges: string
   pickFile: string
   find: string
-  findInFile: string
+  findInFile(shortcut: string): string
   findingFile: string
   fileNotFound: string
   findFileFailed(reason: string): string
@@ -46,7 +46,7 @@ const KOREAN: Messages = {
   hasUncommittedChanges: '커밋 전 변경 있음',
   pickFile: '내용이 같은 파일이 여러 개예요. 보고 있는 파일을 골라 주세요.',
   find: '찾기',
-  findInFile: '파일 안에서 찾기 (Ctrl+F)',
+  findInFile: (shortcut) => `파일 안에서 찾기 (${shortcut})`,
   findingFile: '파일 찾는 중…',
   fileNotFound: 'git 저장소에서 이 파일을 찾지 못했어요 (git이 무시하는 파일이거나, 저장하지 않은 수정이 있을 수 있어요)',
   findFileFailed: (reason) => `파일 찾기 실패: ${reason}`,
@@ -78,7 +78,7 @@ const ENGLISH: Messages = {
   hasUncommittedChanges: 'has uncommitted changes',
   pickFile: 'Several files have exactly this text. Pick the one you are viewing.',
   find: 'Find',
-  findInFile: 'Find in file (Ctrl+F)',
+  findInFile: (shortcut) => `Find in file (${shortcut})`,
   findingFile: 'Finding the file…',
   fileNotFound: 'This file was not found in a git repository (git may ignore it, or it may have unsaved edits)',
   findFileFailed: (reason) => `Could not find the file: ${reason}`,

@@ -6,6 +6,7 @@ import { relativeTime } from './format'
 import { language, text } from './language'
 import { fileTypeOf, guessFileType, highlightLines } from './highlight'
 import { describeText, toLines } from './identify'
+import { findShortcut } from './platform'
 import { STYLE } from './style'
 
 /** The id git blame gives lines that are not committed yet. */
@@ -147,7 +148,7 @@ function renderBar(): void {
   } else if (blame) {
     bar.append(element('span', 'summary', summarize(blame)))
   }
-  bar.append(element('span', 'grow'), button(text.find, text.findInFile, openFind))
+  bar.append(element('span', 'grow'), button(text.find, text.findInFile(findShortcut(navigator.platform)), openFind))
 }
 
 function setNotice(text: string, isError = false): void {

@@ -23,3 +23,8 @@ test('counts the other changed lines in the singular and the plural in English',
   assert.equal(messagesFor('en').moreLinesChanged(4), '4 more lines changed in the same place')
   assert.equal(messagesFor('ko').moreLinesChanged(4), '같은 자리에서 4줄이 더 바뀌었어요')
 })
+
+test('names the find shortcut it is given, since a Mac has another', () => {
+  assert.equal(messagesFor('en').findInFile('⌘F'), 'Find in file (⌘F)')
+  assert.equal(messagesFor('ko').findInFile('Ctrl+F'), '파일 안에서 찾기 (Ctrl+F)')
+})

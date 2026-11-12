@@ -1,3 +1,4 @@
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, assert, mockHost, mountWorker, test } from 'orca/testing'
@@ -13,13 +14,25 @@ function repo(at?: string): TestRepo {
   return created
 }
 
+const folders: string[] = []
+
+/** A folder that is not a git repository. */
+function folder(): string {
+  const created = mkdtempSync(path.join(tmpdir(), 'line-blame-folder-'))
+  folders.push(created)
+  return created
+}
+
 afterEach(() => {
   for (const created of repos.splice(0)) {
     created.dispose()
   }
+  for (const created of folders.splice(0)) {
+    rmSync(created, { recursive: true, force: true })
+  }
 })
 
-type ListedWorkspace = { name: string; root: string; branch: string; hostId?: string }
+type ListedWorkspace = { name: string; root: string; branch: string | null; hostId?: string }
 
 /** The worker as Orca runs it, with Orca listing these workspaces. */
 function mount(workspaces: ListedWorkspace[]) {
@@ -356,3 +369,59 @@ test('refuses a folder inside a workspace that is not a repository', async () =>
     rejectsWith('invalid_params')
   )
 })
+
+test('locate says that git cannot be run, rather than that the file is not found', async () => {
+  const main = repo()
+  main.write('src/a.ts', 'one\n')
+  main.commit('first')
+  const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+  const input = describe(main, 'one\n')
+  // Windows names the variable Path; Node reads and writes it under either name.
+  const before = process.env.PATH
+  process.env.PATH = path.join(main.root, 'no-programs-here')
+  try {
+    await assert.rejects(mounted.request('locate', input), /git could not be run/)
+  } finally {
+    process.env.PATH = before
+  }
+})
+
+test('locate passes over a workspace folder that is not a git repository', async () => {
+  const main = repo()
+  main.write('src/a.ts', 'one\n')
+  main.commit('first')
+  const mounted = await mount([
+    { name: 'Folder', root: folder(), branch: null },
+    { name: 'Main', root: main.root, branch: 'main' }
+  ])
+
+  const found = await mounted.request('locate', describe(main, 'one\n', null))
+  const missing = await mounted.request('locate', describe(main, 'in no repository\n', null))
+
+  assert.deepEqual(
+    found.matches.map((match) => match.workspaceName),
+    ['Main']
+  )
+  assert.deepEqual(missing.matches, [])
+})
+
+// macOS keeps file names in one Unicode form and git there answers in the other; Windows and Linux
+// keep a name exactly as written. Either way the path git gives must open the file.
+for (const form of ['NFC', 'NFD'] as const) {
+  test(`locate and blame work for a file with a Korean name written in ${form}`, async () => {
+    const name = '한글 파일'.normalize(form)
+    const main = repo()
+    main.write(`src/${name}.ts`, 'one\n')
+    main.commit('first')
+    const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+
+    const { matches } = await mounted.request('locate', describe(main, 'one\n'))
+    const blame = await mounted.request('blame', { root: main.root, path: matches[0]?.path })
+
+    assert.deepEqual(
+      matches.map((match) => match.path.normalize('NFC')),
+      ['src/한글 파일.ts']
+    )
+    assert.equal(blame.commits[blame.lines[0]].summary, 'first')
+  })
+}

@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { OrcaWorkerApi } from 'orca/worker'
 import { parseBlame } from './blame'
 import { lineChange, parseHunks } from './change'
-import { git } from './git'
+import { git, type GitFailure } from './git'
 import { locateChanged, locateCommitted, type Repository } from './locate'
 import type { FileMatch, FileRevision, LocateInput } from './protocol'
 import { nestedRepositories } from './repositories'
@@ -94,13 +94,27 @@ export default function activate(orca: OrcaWorkerApi) {
     return match.root
   }
 
-  /** The matches of the first repository, in order, that has any; several repositories are searched at once. */
-  async function firstMatches(repositories: Repository[], search: Search, input: LocateInput): Promise<FileMatch[]> {
+  /**
+   * The matches of the first repository, in order, that has any; several repositories are searched
+   * at once. A repository that could not be searched has no match and is noted in `failures`.
+   */
+  async function firstMatches(
+    repositories: Repository[],
+    search: Search,
+    input: LocateInput,
+    failures: Error[]
+  ): Promise<FileMatch[]> {
     for (let start = 0; start < repositories.length; start += SEARCHED_AT_ONCE) {
       const found = await Promise.all(
         repositories.slice(start, start + SEARCHED_AT_ONCE).map((repository) =>
-          // A folder workspace that is not a git repository answers with git's error: no match there.
-          search(repository, input).catch((): FileMatch[] => [])
+          search(repository, input).catch((error: Partial<GitFailure>): FileMatch[] => {
+            // A folder workspace is no repository: that is ordinary, not a failure.
+            if (error.reason !== 'not-a-repository') {
+              const where = error.reason === 'git-missing' ? '' : ` (in ${repository.name})`
+              failures.push(new Error(`${error.message}${where}`))
+            }
+            return []
+          })
         )
       )
       const matches = found.find((each) => each.length > 0)
@@ -126,13 +140,18 @@ export default function activate(orca: OrcaWorkerApi) {
       [others, locateCommitted],
       [others.slice(0, MAX_OTHER_REPOSITORIES_FOR_CHANGES), locateChanged]
     ]
+    const failures: Error[] = []
     for (const [repositories, search] of searches) {
-      const matches = await firstMatches(repositories, search, input)
+      const matches = await firstMatches(repositories, search, input, failures)
       if (matches.length > 0) {
         return { matches }
       }
     }
     orca.log(`locate: no file with this text in ${focused.length + others.length} repositories`)
+    // "Not found" would hide the real trouble when git is missing or refused to read a repository.
+    if (failures.length > 0) {
+      throw failures[0]
+    }
     return { matches: [] }
   })
 
