@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "line-blame",
   "name": "Line Blame",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Git blame for each line, GitLens style: click a line to see who changed it, when and why, then step back through the commits that changed it before.",
   "icon": "images/icon.png",
   "cover": {

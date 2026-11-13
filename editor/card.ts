@@ -52,8 +52,8 @@ function changeView(change: LineChange): HTMLElement {
 }
 
 /**
- * The commit card: who changed the line, the whole message, what the commit did to the line, and
- * buttons that walk back through the commits that changed the line before.
+ * The commit card: who changed the line, the whole message, what the commit did to the line,
+ * buttons that walk back through the commits that changed the line before, and a list of them all.
  */
 export function createCard(host: CardHost): Card {
   const card = element('div')
@@ -64,6 +64,11 @@ export function createCard(host: CardHost): Card {
   /** The line's history walked so far, newest first; `position` is the step on show. */
   let trail: Step[] = []
   let position = 0
+  /** True once the worker listed every commit that changed the line: the trail is then that list. */
+  let complete = false
+  /** The list of the trail is on show, rather than one step of it. */
+  let listing = false
+  let listError = ''
   let pinned = false
   let hideTimer = 0
   /** Bumped by every show and hide, so an answer for a card since closed is dropped. */
@@ -81,6 +86,9 @@ export function createCard(host: CardHost): Card {
     setPinned(false)
     trail = []
     position = 0
+    complete = false
+    listing = false
+    listError = ''
   }
 
   function place(): void {
@@ -113,7 +121,72 @@ export function createCard(host: CardHost): Card {
     }
   }
 
+  /** Shows one step of the trail, loading what its commit did to the line if that is not known yet. */
+  function open(index: number): void {
+    position = index
+    listing = false
+    render()
+    if (!trail[position].detail && !trail[position].error) {
+      void load(trail[position])
+    }
+  }
+
+  /** Lists every commit that changed the line; the first time, asks the worker for them. */
+  async function showAll(): Promise<void> {
+    listing = true
+    listError = ''
+    render()
+    if (complete) {
+      return
+    }
+    const mine = session
+    const newest = trail[0]
+    try {
+      const { entries } = await orca.plugin.request('history', {
+        root,
+        revision: { sha: newest.commit.sha, path: newest.commit.path },
+        line: newest.line
+      })
+      if (mine !== session) {
+        return
+      }
+      if (entries.length === 0) {
+        throw new Error('git listed no commit for this line')
+      }
+      // Git follows the line itself, more surely than stepping back by likeness does: its list
+      // replaces the steps walked so far, keeping what was already loaded for the same commit.
+      const walked = new Map(trail.map((step) => [`${step.commit.sha} ${step.line}`, step]))
+      const shown = trail[position].commit.sha
+      trail = entries.map(
+        (entry) =>
+          walked.get(`${entry.commit.sha} ${entry.sourceLine}`) ?? {
+            commit: entry.commit,
+            line: entry.sourceLine,
+            detail: null,
+            error: ''
+          }
+      )
+      position = Math.max(
+        0,
+        trail.findIndex((step) => step.commit.sha === shown)
+      )
+      complete = true
+    } catch (error) {
+      if (mine !== session) {
+        return
+      }
+      listError = (error as Error).message
+    }
+    render()
+  }
+
   async function older(): Promise<void> {
+    if (complete) {
+      if (position < trail.length - 1) {
+        open(position + 1)
+      }
+      return
+    }
     const step = trail[position]
     const previousLine = step.detail?.change?.previousLine ?? null
     if (!step.commit.previous || previousLine === null) {
@@ -146,9 +219,62 @@ export function createCard(host: CardHost): Card {
     }
   }
 
+  function closeButton(): HTMLButtonElement {
+    // Drawn always and shown by the `pinned` class: redrawing the card on the press that pins
+    // it would swallow that press.
+    return Object.assign(button('✕', text.close, hide), { className: 'close' })
+  }
+
+  function renderList(): void {
+    const now = Date.now() / 1000
+    const head = element('div', 'head')
+    head.append(
+      element('span', 'who', complete ? text.changesOfLine(trail.length) : text.allChanges),
+      element('span', 'grow'),
+      closeButton()
+    )
+    const parts: HTMLElement[] = [head]
+    if (listError) {
+      parts.push(element('div', 'label warn', text.loadFailed(listError)))
+    } else if (!complete) {
+      parts.push(element('div', 'label', text.loadingHistory))
+    } else {
+      const list = element('div', 'history')
+      for (const [index, { commit }] of trail.entries()) {
+        // The list cuts a long title short: the tooltip has all of it, with the exact time and the commit.
+        const tip = [commit.summary, `${dateTime(commit.time, language)} · ${commit.sha.slice(0, 8)}`].join('\n')
+        const row = button('', tip, () => open(index))
+        row.className = index === position ? 'current' : ''
+        row.append(
+          element('span', 'when', relativeTime(commit.time, now, language)),
+          element('span', 'who', commit.author),
+          element('span', 'summary', commit.summary)
+        )
+        list.append(row)
+      }
+      parts.push(list)
+    }
+    const foot = element('div', 'foot')
+    foot.append(
+      element('span', 'grow'),
+      button(text.backToChange, text.backToLaterChange, () => {
+        listing = false
+        render()
+      })
+    )
+    parts.push(foot)
+    card.replaceChildren(...parts)
+    card.hidden = false
+    place()
+  }
+
   function render(): void {
     const step = trail[position]
     if (!step) {
+      return
+    }
+    if (listing) {
+      renderList()
       return
     }
     const { commit, detail } = step
@@ -159,9 +285,7 @@ export function createCard(host: CardHost): Card {
       element('span', 'who', commit.author),
       element('span', 'when', `${relativeTime(commit.time, now, language)} (${dateTime(commit.time, language)})`),
       element('span', 'grow'),
-      // Drawn always and shown by the `pinned` class: redrawing the card on the press that pins
-      // it would swallow that press.
-      Object.assign(button('✕', text.close, hide), { className: 'close' })
+      closeButton()
     )
     const parts: HTMLElement[] = [head]
     if (position > 0) {
@@ -179,12 +303,15 @@ export function createCard(host: CardHost): Card {
       parts.push(changeView(detail.change))
     }
 
-    const canGoOlder = commit.previous !== null && (detail?.change?.previousLine ?? null) !== null
+    const canGoOlder = complete
+      ? position < trail.length - 1
+      : commit.previous !== null && (detail?.change?.previousLine ?? null) !== null
     const foot = element('div', 'foot')
     foot.append(
       element('span', 'sha', commit.sha.slice(0, 8)),
       element('span', 'mail', commit.mail),
       element('span', 'grow'),
+      button(text.allChanges, text.showAllChanges, () => void showAll()),
       Object.assign(
         button(
           text.earlierChange,
@@ -230,6 +357,9 @@ export function createCard(host: CardHost): Card {
       root = nextRoot
       setPinned(false)
       position = 0
+      complete = false
+      listing = false
+      listError = ''
       trail = [{ commit, line, detail: null, error: '' }]
       render()
       void load(trail[0])

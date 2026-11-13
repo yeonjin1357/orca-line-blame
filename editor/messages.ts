@@ -33,6 +33,11 @@ export type Messages = {
   firstWrittenHere: string
   laterChange: string
   backToLaterChange: string
+  allChanges: string
+  showAllChanges: string
+  changesOfLine(count: number): string
+  loadingHistory: string
+  backToChange: string
   noResults: string
   matchCase: string
   previousMatch: string
@@ -65,6 +70,11 @@ const KOREAN: Messages = {
   firstWrittenHere: '이 줄은 이 커밋에서 처음 생겼어요',
   laterChange: '다음 변경 ▶',
   backToLaterChange: '더 최근 변경으로 돌아가기',
+  allChanges: '전체 기록',
+  showAllChanges: '이 줄을 바꾼 커밋을 모두 보기',
+  changesOfLine: (count) => `이 줄을 바꾼 커밋 ${count}개`,
+  loadingHistory: '기록 불러오는 중…',
+  backToChange: '돌아가기',
   noResults: '결과 없음',
   matchCase: '대소문자 구분',
   previousMatch: '이전 (Shift+Enter)',
@@ -98,6 +108,11 @@ const ENGLISH: Messages = {
   firstWrittenHere: 'This commit wrote the line first',
   laterChange: 'Later change ▶',
   backToLaterChange: 'Back to the more recent change',
+  allChanges: 'All changes',
+  showAllChanges: 'List every commit that changed this line',
+  changesOfLine: (count) => (count === 1 ? '1 commit changed this line' : `${count} commits changed this line`),
+  loadingHistory: 'Loading the history…',
+  backToChange: 'Back',
   noResults: 'No results',
   matchCase: 'Match case',
   previousMatch: 'Previous (Shift+Enter)',

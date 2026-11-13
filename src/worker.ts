@@ -3,6 +3,7 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { parseBlame } from './blame'
 import { lineChange, parseHunks } from './change'
 import { git, type GitFailure } from './git'
+import { LINE_HISTORY_FORMAT, parseLineHistory } from './history'
 import { locateChanged, locateCommitted, type Repository } from './locate'
 import type { FileMatch, FileRevision, LocateInput } from './protocol'
 import { nestedRepositories } from './repositories'
@@ -11,6 +12,8 @@ import { nestedRepositories } from './repositories'
 const MAX_OTHER_REPOSITORIES_FOR_CHANGES = 8
 /** Repositories searched at the same time. */
 const SEARCHED_AT_ONCE = 8
+/** Commits listed for one line: more would no longer be a list to look over. */
+const MAX_HISTORY = 200
 /** `hostId` of workspaces on this machine; any other is on a host git here cannot reach. */
 const LOCAL_HOST_IDS: readonly (string | null)[] = [null, 'local']
 /** The tree with no files: diffing from it shows a commit's first version of a file as all new. */
@@ -185,5 +188,13 @@ export default function activate(orca: OrcaWorkerApi) {
       throw invalid('that revision has no such line')
     }
     return { commit, sourceLine: blame.sourceLines[line - 1] }
+  })
+
+  orca.panels.handle('history', async (input) => {
+    const root = await knownRoot(input.root)
+    const { sha, path: file } = revision(input.revision)
+    const line = lineNumber(input.line)
+    const log = await git(root, ['log', `--max-count=${MAX_HISTORY}`, LINE_HISTORY_FORMAT, '-L', `${line},${line}:${file}`, sha])
+    return { entries: parseLineHistory(log) }
   })
 }

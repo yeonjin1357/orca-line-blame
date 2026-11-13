@@ -28,3 +28,9 @@ test('names the find shortcut it is given, since a Mac has another', () => {
   assert.equal(messagesFor('en').findInFile('⌘F'), 'Find in file (⌘F)')
   assert.equal(messagesFor('ko').findInFile('Ctrl+F'), '파일 안에서 찾기 (Ctrl+F)')
 })
+
+test('counts the commits that changed a line in the singular and the plural in English', () => {
+  assert.equal(messagesFor('en').changesOfLine(1), '1 commit changed this line')
+  assert.equal(messagesFor('en').changesOfLine(4), '4 commits changed this line')
+  assert.equal(messagesFor('ko').changesOfLine(4), '이 줄을 바꾼 커밋 4개')
+})

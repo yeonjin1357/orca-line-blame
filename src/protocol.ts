@@ -78,11 +78,18 @@ export type DetailOutput = {
 export type LineBlameInput = { root: string; revision: FileRevision; line: number }
 export type LineBlameOutput = { commit: BlameCommit; sourceLine: number }
 
+/** One commit that changed a line; `sourceLine` counts from 1 in `commit.path` at `commit.sha`. */
+export type HistoryEntry = { commit: BlameCommit; sourceLine: number }
+/** Every commit that changed line `line` of `revision`, that revision's own first, then older ones. */
+export type HistoryInput = { root: string; revision: FileRevision; line: number }
+export type HistoryOutput = { entries: HistoryEntry[] }
+
 declare module 'orca' {
   interface PluginRequests {
     locate: { input: LocateInput; output: LocateOutput }
     blame: { input: BlameInput; output: BlameOutput }
     detail: { input: DetailInput; output: DetailOutput }
     lineBlame: { input: LineBlameInput; output: LineBlameOutput }
+    history: { input: HistoryInput; output: HistoryOutput }
   }
 }

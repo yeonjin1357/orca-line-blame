@@ -425,3 +425,82 @@ for (const form of ['NFC', 'NFD'] as const) {
     assert.equal(blame.commits[blame.lines[0]].summary, 'first')
   })
 }
+
+/** A file whose second line is rewritten twice, with commits in between that leave the line alone. */
+function repoWithLineHistory(): { main: TestRepo; first: string; reworded: string; renamed: string } {
+  const main = repo()
+  main.write('src/old.ts', 'one\ntwo\nthree\n')
+  const first = main.commit('write the file')
+  main.write('src/old.ts', 'one\nTWO\nthree\n')
+  const reworded = main.commit('reword line two')
+  main.write('src/old.ts', 'zero\none\nTWO\nthree\n')
+  main.commit('add a line above')
+  main.git('mv', 'src/old.ts', 'src/new.ts')
+  main.write('src/new.ts', 'zero\none\nTwo!\nthree\n')
+  const renamed = main.commit('rename the file and reword line two again')
+  main.write('src/new.ts', 'zero\none\nTwo!\nthree\nfour\n')
+  main.commit('add a line below')
+  return { main, first, reworded, renamed }
+}
+
+test('history lists the commits that changed a line, newest first, and none that only moved it', async () => {
+  const { main, first, reworded, renamed } = repoWithLineHistory()
+  const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+
+  const { entries } = await mounted.request('history', { root: main.root, revision: { sha: renamed, path: 'src/new.ts' }, line: 3 })
+
+  assert.deepEqual(
+    entries.map((entry) => ({ sha: entry.commit.sha, summary: entry.commit.summary, line: entry.sourceLine })),
+    [
+      { sha: renamed, summary: 'rename the file and reword line two again', line: 3 },
+      { sha: reworded, summary: 'reword line two', line: 2 },
+      { sha: first, summary: 'write the file', line: 2 }
+    ]
+  )
+})
+
+test('history follows the line into the name the file had before, and each entry opens in detail', async () => {
+  const { main, reworded, renamed } = repoWithLineHistory()
+  const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+  const { entries } = await mounted.request('history', { root: main.root, revision: { sha: renamed, path: 'src/new.ts' }, line: 3 })
+
+  const newest = await mounted.request('detail', { root: main.root, commit: entries[0].commit, line: entries[0].sourceLine })
+  const earlier = await mounted.request('detail', { root: main.root, commit: entries[1].commit, line: entries[1].sourceLine })
+  const oldest = await mounted.request('detail', { root: main.root, commit: entries[2].commit, line: entries[2].sourceLine })
+
+  assert.equal(entries[1].commit.sha, reworded)
+  assert.equal(entries[1].commit.path, 'src/old.ts')
+  assert.deepEqual([newest.change?.removed, newest.change?.added], [['TWO'], ['Two!']])
+  assert.deepEqual([earlier.change?.removed, earlier.change?.added], [['two'], ['TWO']])
+  assert.deepEqual(oldest.change?.removed, [])
+  assert.equal(oldest.message, 'write the file')
+})
+
+test('history refuses a revision that is not a full commit id', async () => {
+  const main = repo()
+  main.write('src/a.ts', 'one\n')
+  main.commit('first')
+  const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+
+  await assert.rejects(
+    mounted.request('history', { root: main.root, revision: { sha: 'HEAD', path: 'src/a.ts' }, line: 1 }),
+    rejectsWith('invalid_params')
+  )
+})
+
+test('history opens a commit that changed only the second of two lines later joined into one', async () => {
+  const main = repo()
+  main.write('src/a.ts', 'head\nshipping = 1\ntotal = 1\n')
+  main.commit('write the file')
+  main.write('src/a.ts', 'head\nshipping = 1\ntotal = 2\n')
+  const totalOnly = main.commit('change the total only')
+  main.write('src/a.ts', 'head\nboth = 3\n')
+  const joined = main.commit('join the two lines')
+  const mounted = await mount([{ name: 'Main', root: main.root, branch: 'main' }])
+
+  const { entries } = await mounted.request('history', { root: main.root, revision: { sha: joined, path: 'src/a.ts' }, line: 2 })
+  const entry = entries.find((each) => each.commit.sha === totalOnly)
+  const detail = await mounted.request('detail', { root: main.root, commit: entry!.commit, line: entry!.sourceLine })
+
+  assert.deepEqual([detail.change?.removed, detail.change?.added], [['total = 1'], ['total = 2']])
+})

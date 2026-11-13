@@ -3,7 +3,7 @@ import type { BlameCommit, BlameOutput, FileRevision } from './protocol'
 type CommitDetails = Omit<BlameCommit, 'path'>
 
 /** Undoes git's quoting of a path with characters it will not print bare. */
-function unquotePath(text: string): string {
+export function unquotePath(text: string): string {
   if (!text.startsWith('"') || !text.endsWith('"')) {
     return text
   }

@@ -123,6 +123,19 @@ button:disabled { opacity: 0.45; cursor: default; }
 #card .diff .sign { flex: none; width: 18px; text-align: center; user-select: none; opacity: 0.7; }
 #card .foot { padding-top: 8px; border-top: 1px solid var(--orca-border); font: 12px/1.4 var(--lb-font); }
 #card .sha { user-select: all; }
+#card .history {
+  display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); column-gap: 12px;
+  max-height: 264px; overflow: auto;
+}
+/* Each commit is one button; its three parts sit in the list's columns, so they line up down the list. */
+#card .history button {
+  display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline;
+  padding: 4px 8px; text-align: left; border: 0; border-radius: 4px; background: transparent; white-space: nowrap;
+}
+#card .history button:hover { background: var(--orca-accent); }
+#card .history button.current { box-shadow: inset 3px 0 0 var(--orca-ring); }
+#card .history .who { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+#card .history .summary { max-width: 60ch; overflow: hidden; text-overflow: ellipsis; }
 #card .foot button { font: 12px/1.4 system-ui, 'Pretendard', 'Malgun Gothic', sans-serif; white-space: nowrap; }
 
 .hljs-keyword, .hljs-meta, .hljs-doctag, .hljs-selector-tag, .hljs-template-tag { color: var(--lb-keyword); }

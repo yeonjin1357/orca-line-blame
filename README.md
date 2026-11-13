@@ -14,7 +14,7 @@ Click a line and the answer appears at the end of it, the way GitLens shows it i
 
 **2. See what that commit changed.** Hover over that text. A card shows the whole commit message, and the line before and after the change.
 
-**3. Go back in time.** Press **◀ Earlier change** in the card to see the commit that changed the line before that. Keep pressing to reach the commit that first wrote the line.
+**3. Go back in time.** Press **◀ Earlier change** in the card to see the commit that changed the line before that. Keep pressing to reach the commit that first wrote the line. Or press **All changes** to list every commit that changed the line, and open any of them.
 
 ![The card showing an earlier change of the same line](images/screenshot-history.png)
 
@@ -63,7 +63,7 @@ Orca shows this warning when you install the plugin, because Line Blame starts i
 ## Good to know
 
 - **Two files with the same content.** Orca does not tell a plugin which file is open, so Line Blame finds the file by its content. If two files are identical, pick the right one at the top of the view.
-- **"Earlier change" is a best guess.** Git does not record which old line became which new line, so the plugin follows the most similar one. For a line that was rewritten from scratch it can follow the wrong line.
+- **"Earlier change" is a best guess.** Git does not record which old line became which new line, so the plugin follows the most similar one. For a line that was rewritten from scratch it can follow the wrong line. **All changes** asks git itself to follow the line (`git log -L`); where one line replaced several, it lists the commits that changed any of them.
 - **Language.** The view is in Korean when Orca is, and in English otherwise.
 - **Local workspaces only.** Git runs on the computer Orca runs on.
 - **Repositories inside a workspace.** A repository cloned into a workspace folder, or a submodule, is searched too, up to two folders deep.
@@ -88,6 +88,7 @@ Orca loads `.ts` files as written and never type-checks them. Run `tsc -p .` fro
 | `src/locate.ts` | Finding which file an open text belongs to |
 | `src/repositories.ts` | Finding repositories that sit inside a workspace |
 | `src/blame.ts` | Reading `git blame --porcelain` |
+| `src/history.ts` | Reading `git log -L`: every commit that changed a line |
 | `src/change.ts` | Reading `git diff -U0`: what a commit did to one line and which line it replaced |
 | `src/protocol.ts` | The types the view and the background program exchange |
 | `editor/main.ts` | The view: code lines, the blame text, the summary bar |
